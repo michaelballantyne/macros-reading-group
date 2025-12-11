@@ -40,7 +40,7 @@
 
 ;; 1. Page 13 of "Syntactic Abstraction in Scheme" presents the `mark` and `subst` constructors
 ;;    and the `resolve` operation. Using these constructors, what is the representation of the
-;;    `t` identifier that originated on the `(or #f t)` expression, after all of the marks
+;;    `t` identifier that originated in the `(or #f t)` expression, after all of the marks
 ;;    and substitutions from the expansion steps are applied to it?
 
 ;; 2. Step through the `resolve` operation on the identifier from (1).
