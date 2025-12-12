@@ -1,3 +1,4 @@
+
 ## The problem
 
 ```scheme
@@ -18,6 +19,22 @@
 #f
 ```
 
+```scheme
+(let ([add1 (lambda (x) (+ x 1))])
+  (letrec-syntax ([increment
+                   (lambda (x)
+                     (syntax-case x ()
+                       [(_ x)
+                        #'(set! x (add1 x))]))])
+    (let ([add1 0])
+      (increment add1))))
+;; expands to
+(let ([add1 (lambda (x) (+ x 1))])
+  (let ([add1 0])
+    (set! add1 (add1 x))))
+;; raises error: add1 is not a procedure.
+```
+
 ## Starting at the beginning---"Hygienic macro expansion" by Kohlbecker, Friedman, Felleisen, and Duba in 1986. ("KFFD")
 
 In λ-calculus when we write
@@ -31,16 +48,20 @@ we implicitly assume a "hygiene condition": no bound variable of b is a free var
 So,
 
 ```
-(λx.λy.x) -/->_n λy.y
+(λx.λy.x) y -/->_n λy.y
 ```
 
 Instead, we first α-rename:
 
+```
 (λx.λy.x) y α= (λx.λz.x) y
+```
 
 and then reduce:
 
+```
 (λx.λz.x) -/->_n λz.y
+```
 
 We might also say we think "modulo α-equivalence".
 
@@ -90,10 +111,28 @@ But in general it's not so simple!
   ```
 
   Then we can't understand the template.
-
+  
 - What if `or` is a procedural macro?
   
   The transformation is opaque and may combine syntax in arbitrary ways. We don't get to look at the "template" until we've already expanded!
+
+- What if a macro used in the template duplicates syntax?
+  
+  ```scheme
+  (let-syntax ([let-inc (lambda (stx)
+                          (syntax-case stx ()
+                            [(_ v body)
+                             #'(let ([v (+ v 1)]) body)]))])
+    (let ([x 5])
+      (let-syntax ([m (lambda (stx)
+                        (syntax-case stx ()
+                          [(_ y)
+                           #'(let-inc x (+ x y))]))])
+      (m x))))
+  ```
+  
+  Then there may not exist any single alpha-renaming of the template that produces the desired result! In this example we want to rename the copy of `x` used as a binder, but not the copy used as a reference.
+
 
 So, what can we do?
 
