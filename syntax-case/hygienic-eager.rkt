@@ -19,25 +19,31 @@
   (gensym-counter (+ 1 (gensym-counter)))
   (string->symbol (format "~a~a" sym (gensym-counter))))
 
-(struct identifier [symbol marks] #:transparent)
+(struct identifier [symbol marks quoted] #:transparent)
 
-(define (strip id)
-  (identifier-symbol id))
+(define (quoted stx)
+  (match stx
+    [(or (? number?) (? boolean?) (? string?) '())
+     stx]
+    [(? identifier?)
+     (identifier-quoted stx)]
+    [(cons s1 s2)
+     (cons (quoted s1) (quoted s2))]))
 
 (define (resolve id)
-  (strip id))
+  (identifier-symbol id))
 
 (define (fresh-mark)
   (gensym 'm))
 
 (define (mark-id id m)
   (match id
-    [(identifier sym marks)
+    [(identifier sym marks quoted)
      (define new-marks
        (if (member m marks)
            (remove m marks)
            (cons m marks)))
-     (identifier sym new-marks)]))
+     (identifier sym new-marks quoted)]))
 
 (define (mark-syntax stx m)
   (match stx
@@ -73,7 +79,7 @@
      (macro-application i e*)]
     [`(,quote-id ,e)
      #:when (equal? (special-form 'quote) (hash-ref env (resolve quote-id) #f))
-     (symbolic-data e)]
+     (symbolic-data (quoted e))]
     [`(,lambda-id (,param) ,body)
      #:when (equal? (special-form 'lambda) (hash-ref env (resolve lambda-id) #f))
      (function param body)]))
@@ -85,8 +91,9 @@
     [(application e1 e*) (application (expand e1 env) (for/list ([e e*]) (expand e env)))]
     [(symbolic-data e) (symbolic-data e)]
     [(function i e)
-     (define i^ (gensym (strip i)))
-     (function i^ (expand (subst e i (identifier i^ '())) (hash-set env i^ (var-binding))))]
+     (define i^ (gensym (identifier-symbol i)))
+     (function i^ (expand (subst e i (identifier i^ '() (identifier-quoted i)))
+                          (hash-set env i^ (var-binding))))]
     [(macro-application i e*)
      (match-define (transformer t) (hash-ref env (resolve i)))
      (define m (fresh-mark))
@@ -99,16 +106,17 @@
 (define (datum->syntax d)
   (match d
     [(or (? number?) (? boolean?) (? string?) '()) d]
-    [(? symbol?) (identifier d '())]
+    [(? symbol?) (identifier d '() d)]
     [(? identifier?) d] ; so we can use in a transformer where inputs are already syntax
     [(cons d1 d2) (cons (datum->syntax d1) (datum->syntax d2))]))
 
 (define (as-surface-syntax expr)
   (match expr
     [(constant c) c]
-    [(variable (identifier s _)) s]
+    [(variable (identifier s _ _)) s]
     [(application e1 e*) `(,(as-surface-syntax e1) . ,(map as-surface-syntax e*))]
-    [(symbolic-data e) e]
+    [(symbolic-data (or (? number? c) (? boolean? c) (? string? c))) c]
+    [(symbolic-data e) `',e]
     [(function s e) `(lambda (,s) ,(as-surface-syntax e))]))
 
 (define (expand-top e [extra-bindings '()])
@@ -134,11 +142,11 @@
    (expand-top
     '((lambda (t)
         (or #f t))
-      #t)
+      'x)
     (hash 'or or-transformer
           'if (var-binding)))
    '((lambda (t1)
        ((lambda (t3)
           (if t3 t3 t1))
         #f))
-     #t)))
+     'x)))
