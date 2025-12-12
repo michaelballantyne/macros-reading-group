@@ -19,40 +19,36 @@
   (gensym-counter (+ 1 (gensym-counter)))
   (string->symbol (format "~a~a" sym (gensym-counter))))
 
-(struct identifier [symbol marks quoted] #:transparent)
+(struct identifier [symbol variable marks] #:transparent)
 
-(define (quoted stx)
+(define (strip stx)
   (match stx
     [(or (? number?) (? boolean?) (? string?) '())
      stx]
     [(? identifier?)
-     (identifier-quoted stx)]
+     (identifier-symbol stx)]
     [(cons s1 s2)
-     (cons (quoted s1) (quoted s2))]))
+     (cons (strip s1) (strip s2))]))
 
 (define (resolve id)
-  (identifier-symbol id))
+  (identifier-variable id))
 
 (define (fresh-mark)
   (gensym 'm))
 
-(define (mark-id id m)
-  (match id
-    [(identifier sym marks quoted)
+(define (mark stx m)
+  (match stx
+    [(or (? number?) (? boolean?) (? string?) '())
+     stx]
+    [(identifier sym variable marks)
      (define new-marks
        (if (member m marks)
            (remove m marks)
            (cons m marks)))
-     (identifier sym new-marks quoted)]))
-
-(define (mark-syntax stx m)
-  (match stx
-    [(or (? number?) (? boolean?) (? string?) '())
-     stx]
-    [(? identifier?)
-     (mark-id stx m)]
+     (identifier sym variable new-marks)]
     [(cons s1 s2)
-     (cons (mark-syntax s1 m) (mark-syntax s2 m))]))
+     (cons (mark s1 m) (mark s2 m))]))
+
 
 (define (subst stx id sym)
   (match stx
@@ -79,7 +75,7 @@
      (macro-application i e*)]
     [`(,quote-id ,e)
      #:when (equal? (special-form 'quote) (hash-ref env (resolve quote-id) #f))
-     (symbolic-data (quoted e))]
+     (symbolic-data (strip e))]
     [`(,lambda-id (,param) ,body)
      #:when (equal? (special-form 'lambda) (hash-ref env (resolve lambda-id) #f))
      (function param body)]))
@@ -91,13 +87,13 @@
     [(application e1 e*) (application (expand e1 env) (for/list ([e e*]) (expand e env)))]
     [(symbolic-data e) (symbolic-data e)]
     [(function i e)
-     (define i^ (gensym (identifier-symbol i)))
-     (function i^ (expand (subst e i (identifier i^ '() (identifier-quoted i)))
-                          (hash-set env i^ (var-binding))))]
+     (define new-var (gensym (identifier-variable i)))
+     (function new-var (expand (subst e i (identifier (identifier-symbol i) new-var '()))
+                               (hash-set env new-var (var-binding))))]
     [(macro-application i e*)
      (match-define (transformer t) (hash-ref env (resolve i)))
      (define m (fresh-mark))
-     (expand (mark-syntax (t (mark-syntax `(,i . ,e*) m)) m) env)]))
+     (expand (mark (t (mark `(,i . ,e*) m)) m) env)]))
 
 (define initial-env
   (hash 'quote (special-form 'quote)
@@ -106,14 +102,14 @@
 (define (datum->syntax d)
   (match d
     [(or (? number?) (? boolean?) (? string?) '()) d]
-    [(? symbol?) (identifier d '() d)]
+    [(? symbol?) (identifier d d '())]
     [(? identifier?) d] ; so we can use in a transformer where inputs are already syntax
     [(cons d1 d2) (cons (datum->syntax d1) (datum->syntax d2))]))
 
 (define (as-surface-syntax expr)
   (match expr
     [(constant c) c]
-    [(variable (identifier s _ _)) s]
+    [(variable (identifier _ v _)) v]
     [(application e1 e*) `(,(as-surface-syntax e1) . ,(map as-surface-syntax e*))]
     [(symbolic-data (or (? number? c) (? boolean? c) (? string? c))) c]
     [(symbolic-data e) `',e]
