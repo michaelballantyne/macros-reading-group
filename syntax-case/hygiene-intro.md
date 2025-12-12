@@ -1,4 +1,24 @@
-Starting at the beginning---"Hygienic macro expansion" by Kohlbecker, Friedman, Felleisen, and Duba in 1986. ("KFFD")
+## The problem
+
+```scheme
+(define-syntax or
+  (lambda (stx)
+    (syntax-case stx ()
+      [( e1 e2)
+       #'(let ([t e1])
+           (if t t e2))])))
+
+(let ([t #t])
+  (or #f t))
+;; expands to
+(let ([t #t])
+  (let ([t #f])
+    (if t t t)))
+;; evaluates to:
+#f
+```
+
+## Starting at the beginning---"Hygienic macro expansion" by Kohlbecker, Friedman, Felleisen, and Duba in 1986. ("KFFD")
 
 In λ-calculus when we write
 
@@ -28,7 +48,7 @@ KFFD's idea was to somehow apply this notion to macros.
 
 At first it looks straightforward. In the `or` example:
 
-```
+```scheme
 (define-syntax or
   (lambda (stx)
     (syntax-case stx ()
@@ -37,12 +57,12 @@ At first it looks straightforward. In the `or` example:
            (if t t e2))])))
 
 (let ([t #t])
-   (or #f t))
+  (or #f t))
 ```
 
 we could α-rename the macro template:
 
-```
+```scheme
 (let ([t e1])
   (if t t e2))
 α=
@@ -52,7 +72,7 @@ we could α-rename the macro template:
 
 and then expand, producing the result we want:
 
-```
+```scheme
 (let ([t #t])
   (or #f t))
 -->
@@ -65,7 +85,7 @@ But in general it's not so simple!
 
 - What if `let` itself is a macro?
 
-  ```
+  ```scheme
   (let ([x e]) b) --> ((λ (x) b) e)
   ```
 
@@ -80,4 +100,4 @@ So, what can we do?
 1. Annotate syntax during expansion with extra information about its origin.
 2. Use that information when α-renaming later.
 
-KFFD had one, simplistic strategy for this. "Syntactic abstraction in Scheme" provides a more sophisticated strategy that interleavings marking and substitution steps, supporing a greater variety of macros.
+KFFD had one, simplistic strategy for this. "Syntactic abstraction in Scheme" provides a more sophisticated strategy that interleaves marking and substitution steps, supporting a greater variety of macros.
