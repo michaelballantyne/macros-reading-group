@@ -141,7 +141,7 @@ resolve(subst(mark(mark(subst(t, t, t1), m1), m1), mark(t, m1), t2))
                        [(_ x)
                         #'(set! x (add1_1 x))]))])
     (let ([add1_2 0])
-      〚(set! add1_2 (add1 add1_2))〛)))
+      (set! add1_2 (add1 add1_2)))))
 
 ;; Because the macro-introduced add1 had the mark attached,
 ;; neither substitution captured it, so it ended up unbound.
