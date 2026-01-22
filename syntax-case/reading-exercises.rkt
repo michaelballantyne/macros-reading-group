@@ -27,11 +27,11 @@
 ;; -> transformer application marks introduced names
 (let ([t1 #t])
   〚(let ([tᵐ¹ #f])
-     (if tᵐ¹ tᵐ¹ t))〛)
+     (if tᵐ¹ tᵐ¹ t1))〛)
 ;; -> substitute let binder (marked names are distinct from unmarked names when substituting)
 (let ([t1 #t])
   (let ([t2 #f])
-    〚(if t2 t2 t)〛))
+    〚(if t2 t2 t1)〛))
 
 ;;
 ;; Exercises
