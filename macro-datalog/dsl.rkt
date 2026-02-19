@@ -8,11 +8,11 @@
 
 (define (merge-new-rows tables)
   (for ([t tables])
-    (match-define (table exisiting new) t)
-    (set-union! exisiting new)
+    (match-define (table existing new) t)
+    (set-union! existing new)
     (set-clear! new)))
 
-(struct table [existing new])
+(struct table [existing new] #:transparent)
 
 (define (make-table [initial '()])
   (table (apply mutable-set initial)
@@ -22,17 +22,17 @@
   (table-existing t))
 
 (define (add-row! t row)
-  (match-define (table exisiting new) t)
-  (when (and (not (set-member? new row)) (not (set-member? exisiting row)))
+  (match-define (table existing new) t)
+  (when (and (not (set-member? new row)) (not (set-member? existing row)))
     (set! changed #t)
     (set-add! new row)))
 
 (define (run tables rules)
+  (set! changed #f)
   (for ([rule rules])
     (rule))
   (merge-new-rows tables)
   (when changed
-    (set! changed #f)
     (run tables rules)))
 
 (define (print-table t)
@@ -73,13 +73,14 @@
     (syntax-parse stx
       #:datum-literals (<--)
       [(_ ([table-name init] ...)
-          print-table
+          table-to-print
           [head <-- body ...]
           ...)
        #'(let ([table-name (make-table init)] ...)
            (run
              (list table-name ...)
              (list (rule head <-- body ...)
-                   ...)))])))
+                   ...))
+           (print-table table-to-print))])))
 
    
